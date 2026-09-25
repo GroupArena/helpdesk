@@ -1,0 +1,150 @@
+import { useState } from 'react';
+import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { 
+  LayoutDashboard, 
+  Package, 
+  Ticket, 
+  Users, 
+  LogOut, 
+  Menu, 
+  X,
+  ChevronRight
+} from 'lucide-react';
+
+export default function Layout() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { userProfile, logout, isAdmin, isSuperAdmin } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login');
+  };
+
+  const navItems = [
+    { to: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['super_admin', 'admin', 'user'] },
+    { to: '/assets', icon: Package, label: 'Actifs / Inventaire', roles: ['super_admin', 'admin', 'user'] },
+    { to: '/tickets', icon: Ticket, label: 'Tickets', roles: ['super_admin', 'admin', 'user'] },
+    { to: '/users', icon: Users, label: 'Utilisateurs', roles: ['super_admin'] },
+  ];
+
+  const filteredNavItems = navItems.filter(item => 
+    userProfile && item.roles.includes(userProfile.role)
+  );
+
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'super_admin': return 'Super Administrateur';
+      case 'admin': return 'Administrateur';
+      default: return 'Utilisateur';
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-[#E1E4EA]">
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`
+        fixed top-0 left-0 h-full w-64 bg-[#19283E] text-white z-50 transform transition-transform duration-300
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+        lg:translate-x-0
+      `}>
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-[#C9A125] rounded-lg flex items-center justify-center font-bold text-[#19283E]">
+              A
+            </div>
+            <div>
+              <h1 className="font-bold text-sm">Groupe ARENA</h1>
+              <p className="text-xs text-gray-400">Helpdesk & Inventaire</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setSidebarOpen(false)}
+            className="lg:hidden text-gray-400 hover:text-white"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* User info */}
+        <div className="p-4 border-b border-white/10">
+          <p className="font-medium text-sm truncate">{userProfile?.displayName}</p>
+          <p className="text-xs text-[#C9A125]">{getRoleLabel(userProfile?.role || '')}</p>
+        </div>
+
+        {/* Navigation */}
+        <nav className="p-3 space-y-1">
+          {filteredNavItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={() => setSidebarOpen(false)}
+              className={({ isActive }) => `
+                flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all
+                ${isActive 
+                  ? 'bg-[#C9A125]/20 text-[#C9A125] font-medium' 
+                  : 'text-gray-300 hover:bg-white/5 hover:text-white'
+                }
+              `}
+            >
+              <item.icon size={18} />
+              <span>{item.label}</span>
+              {isAdmin && item.to === '/tickets' && (
+                <ChevronRight size={14} className="ml-auto" />
+              )}
+            </NavLink>
+          ))}
+        </nav>
+
+        {/* Logout */}
+        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-white/10">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-red-500/20 hover:text-red-400 transition-all w-full"
+          >
+            <LogOut size={18} />
+            <span>Déconnexion</span>
+          </button>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <div className="lg:ml-64">
+        {/* Top navbar */}
+        <header className="bg-white shadow-sm sticky top-0 z-30">
+          <div className="flex items-center justify-between px-4 py-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="lg:hidden text-[#19283E] hover:text-[#C9A125]"
+            >
+              <Menu size={24} />
+            </button>
+            <div className="flex items-center gap-3 ml-auto">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm font-medium text-[#19283E]">{userProfile?.displayName}</p>
+                <p className="text-xs text-gray-500">{userProfile?.email}</p>
+              </div>
+              <div className="w-9 h-9 bg-[#19283E] rounded-full flex items-center justify-center text-white font-medium text-sm">
+                {userProfile?.displayName?.charAt(0).toUpperCase()}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Page content */}
+        <main className="p-4 md:p-6">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}
