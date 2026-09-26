@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { isDemoMode } from '../config/firebase';
 import toast from 'react-hot-toast';
 import { Lock, Mail, Eye, EyeOff } from 'lucide-react';
 
@@ -23,17 +24,22 @@ export default function Login() {
       await login(email, password);
       toast.success('Connexion réussie !');
       navigate('/');
-    } catch (error: any) {
-      console.error(error);
-      const errorMessage = error.code === 'auth/invalid-credential' 
+    } catch (error: unknown) {
+      const err = error as { code?: string; message?: string };
+      const errorMessage = err.code === 'auth/invalid-credential' || err.message === 'auth/invalid-credential'
         ? 'Email ou mot de passe incorrect'
-        : error.code === 'auth/user-not-found'
+        : err.code === 'auth/user-not-found'
         ? 'Aucun compte trouvé avec cet email'
         : 'Erreur de connexion. Veuillez réessayer.';
       toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
+  };
+
+  const fillDemoCredentials = (demoEmail: string) => {
+    setEmail(demoEmail);
+    setPassword('password123');
   };
 
   return (
@@ -107,13 +113,38 @@ export default function Login() {
               )}
             </button>
           </form>
-
-          <div className="mt-6 pt-6 border-t border-gray-200 text-center">
-            <p className="text-sm text-gray-500">
-              Problème de connexion ? Contactez votre administrateur.
-            </p>
-          </div>
         </div>
+
+        {/* Demo credentials */}
+        {isDemoMode && (
+          <div className="mt-6 bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
+            <p className="text-white text-sm font-medium mb-3">🔑 Comptes de démonstration</p>
+            <div className="space-y-2">
+              <button
+                onClick={() => fillDemoCredentials('admin@arena.com')}
+                className="w-full text-left px-3 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
+              >
+                <span className="text-[#C9A125] text-xs font-medium">Super Admin</span>
+                <p className="text-white text-sm">admin@arena.com</p>
+              </button>
+              <button
+                onClick={() => fillDemoCredentials('it@arena.com')}
+                className="w-full text-left px-3 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
+              >
+                <span className="text-blue-300 text-xs font-medium">Admin IT</span>
+                <p className="text-white text-sm">it@arena.com</p>
+              </button>
+              <button
+                onClick={() => fillDemoCredentials('marie@arena.com')}
+                className="w-full text-left px-3 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
+              >
+                <span className="text-gray-300 text-xs font-medium">Utilisateur</span>
+                <p className="text-white text-sm">marie@arena.com</p>
+              </button>
+            </div>
+            <p className="text-gray-400 text-xs mt-3 text-center">Mot de passe : <code className="bg-white/10 px-1.5 py-0.5 rounded">password123</code></p>
+          </div>
+        )}
 
         <p className="text-center text-gray-500 text-xs mt-6">
           © 2024 Groupe ARENA - Tous droits réservés

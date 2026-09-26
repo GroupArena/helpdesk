@@ -1,26 +1,14 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { 
-  User, 
-  signInWithEmailAndPassword, 
-  signOut, 
-  onAuthStateChanged,
-  createUserWithEmailAndPassword
-} from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
+import { signInWithEmailAndPassword, signOut, createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { auth, db, isDemoMode } from '../config/firebase';
+import { dataService, UserProfile } from '../config/dataService';
 
 export type UserRole = 'super_admin' | 'admin' | 'user';
-
-export interface UserProfile {
-  uid: string;
-  email: string;
-  displayName: string;
-  role: UserRole;
-  createdAt: string;
-}
+export type { UserProfile };
 
 interface AuthContextType {
-  currentUser: User | null;
+  currentUser: UserProfile | null;
   userProfile: UserProfile | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -41,69 +29,67 @@ export function useAuth() {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   const isSuperAdmin = userProfile?.role === 'super_admin';
   const isAdmin = userProfile?.role === 'admin' || userProfile?.role === 'super_admin';
 
-  async function fetchUserProfile(user: User) {
-    try {
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      if (userDoc.exists()) {
-        setUserProfile(userDoc.data() as UserProfile);
-      } else {
-        // Créer un profil par défaut si inexistant
-        const defaultProfile: UserProfile = {
-          uid: user.uid,
-          email: user.email || '',
-          displayName: user.displayName || 'Utilisateur',
-          role: 'user',
-          createdAt: new Date().toISOString()
-        };
-        await setDoc(doc(db, 'users', user.uid), defaultProfile);
-        setUserProfile(defaultProfile);
-      }
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-    }
-  }
-
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setCurrentUser(user);
-      if (user) {
-        await fetchUserProfile(user);
-      } else {
-        setUserProfile(null);
-      }
-      setLoading(false);
-    });
+    dataService.init();
 
-    return unsubscribe;
+    if (isDemoMode) {
+      const savedUser = dataService.demoGetCurrentUser();
+      if (savedUser) {
+        setCurrentUser(savedUser);
+        setUserProfile(savedUser);
+      }
+    }
+    setLoading(false);
   }, []);
 
   async function login(email: string, password: string) {
-    await signInWithEmailAndPassword(auth, email, password);
+    if (isDemoMode) {
+      const user = dataService.demoLogin(email, password);
+      if (!user) {
+        throw { code: 'auth/invalid-credential' };
+      }
+      setCurrentUser(user);
+      setUserProfile(user);
+    } else {
+      await signInWithEmailAndPassword(auth, email, password);
+    }
   }
 
   async function logout() {
-    await signOut(auth);
+    if (isDemoMode) {
+      dataService.demoLogout();
+    } else {
+      await signOut(auth);
+    }
+    setCurrentUser(null);
     setUserProfile(null);
   }
 
   async function register(email: string, password: string, displayName: string, role: UserRole) {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const profile: UserProfile = {
-      uid: userCredential.user.uid,
-      email,
-      displayName,
-      role,
-      createdAt: new Date().toISOString()
-    };
-    await setDoc(doc(db, 'users', userCredential.user.uid), profile);
-    setUserProfile(profile);
+    if (isDemoMode) {
+      const newUser = dataService.demoRegister(email, displayName, role);
+      setCurrentUser(newUser);
+      setUserProfile(newUser);
+    } else {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const profile: UserProfile = {
+        uid: userCredential.user.uid,
+        email,
+        displayName,
+        role,
+        createdAt: new Date().toISOString()
+      };
+      await setDoc(doc(db, 'users', userCredential.user.uid), profile);
+      setCurrentUser(profile);
+      setUserProfile(profile);
+    }
   }
 
   const value: AuthContextType = {

@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   // Configuration pour GitHub Pages
   // './' utilise des chemins relatifs, fonctionne quel que soit le nom du repo
-  base: process.env.NODE_ENV === 'production' ? './' : '/',
+  base: './',
   server: {
     host: "0.0.0.0",
     port: 3000,

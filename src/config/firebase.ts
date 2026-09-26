@@ -2,18 +2,26 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-// Configuration Firebase
-// Les valeurs peuvent être définies via des variables d'environnement (.env)
-// ou directement ici pour le développement/démonstration
+// ============================================================
+// CONFIGURATION FIREBASE
+// ============================================================
+// Pour activer Firebase, remplacez les valeurs ci-dessous par vos clés.
+// Vous les trouverez dans Firebase Console > Paramètres du projet > Vos applications
+// 
+// En attendant, l'application fonctionne en MODE DÉMO avec localStorage.
+// ============================================================
 
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyDemoKeyReplaceMe",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "groupe-arena.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "groupe-arena",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "groupe-arena.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "123456789",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:123456789:web:abcdef123456"
+  apiKey: "YOUR_API_KEY_HERE",
+  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
 };
+
+// Détection automatique : si les clés sont encore par défaut, on est en mode démo
+export const isDemoMode = firebaseConfig.apiKey === "YOUR_API_KEY_HERE";
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);

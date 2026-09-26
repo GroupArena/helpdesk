@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { isDemoMode } from '../config/firebase';
 import { 
   LayoutDashboard, 
   Package, 
@@ -9,12 +10,12 @@ import {
   LogOut, 
   Menu, 
   X,
-  ChevronRight
+  AlertTriangle
 } from 'lucide-react';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { userProfile, logout, isAdmin, isSuperAdmin } = useAuth();
+  const { userProfile, logout } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -75,6 +76,14 @@ export default function Layout() {
           </button>
         </div>
 
+        {/* Demo mode banner */}
+        {isDemoMode && (
+          <div className="mx-3 mt-3 p-2 bg-yellow-500/20 border border-yellow-500/30 rounded-lg flex items-center gap-2">
+            <AlertTriangle size={14} className="text-yellow-400 flex-shrink-0" />
+            <p className="text-xs text-yellow-300">Mode Démo - Données locales</p>
+          </div>
+        )}
+
         {/* User info */}
         <div className="p-4 border-b border-white/10">
           <p className="font-medium text-sm truncate">{userProfile?.displayName}</p>
@@ -98,9 +107,6 @@ export default function Layout() {
             >
               <item.icon size={18} />
               <span>{item.label}</span>
-              {isAdmin && item.to === '/tickets' && (
-                <ChevronRight size={14} className="ml-auto" />
-              )}
             </NavLink>
           ))}
         </nav>

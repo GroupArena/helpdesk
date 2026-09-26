@@ -1,56 +1,32 @@
 import { useState, useEffect } from 'react';
 import { useAuth, UserRole } from '../contexts/AuthContext';
-import { db } from '../config/firebase';
+import { dataService, UserProfile } from '../config/dataService';
+import { isDemoMode, db } from '../config/firebase';
 import { collection, getDocs, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
-import { 
-  Users as UsersIcon, 
-  Shield, 
-  ShieldCheck, 
-  User, 
-  Edit2, 
-  Trash2,
-  X,
-  Plus
-} from 'lucide-react';
-
-interface UserData {
-  uid: string;
-  email: string;
-  displayName: string;
-  role: UserRole;
-  createdAt: string;
-}
+import { Users as UsersIcon, Shield, ShieldCheck, User, Trash2, X, Plus } from 'lucide-react';
 
 export default function UsersPage() {
   const { isSuperAdmin, register } = useAuth();
-  const [users, setUsers] = useState<UserData[]>([]);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<UserData | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    displayName: '',
-    role: 'user' as UserRole
-  });
+  const [formData, setFormData] = useState({ email: '', password: '', displayName: '', role: 'user' as UserRole });
 
   useEffect(() => {
-    if (isSuperAdmin) {
-      fetchUsers();
-    }
+    if (isSuperAdmin) fetchUsers();
   }, [isSuperAdmin]);
 
   async function fetchUsers() {
     setLoading(true);
     try {
-      const querySnapshot = await getDocs(collection(db, 'users'));
-      const usersData = querySnapshot.docs.map(doc => ({
-        uid: doc.id,
-        ...doc.data()
-      })) as UserData[];
-      setUsers(usersData);
+      if (isDemoMode) {
+        setUsers(dataService.demoGetUsers());
+      } else {
+        const querySnapshot = await getDocs(collection(db, 'users'));
+        const usersData = querySnapshot.docs.map(d => ({ uid: d.id, ...d.data() })) as UserProfile[];
+        setUsers(usersData);
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
       toast.error('Erreur lors du chargement des utilisateurs');
@@ -71,18 +47,20 @@ export default function UsersPage() {
       setShowCreateModal(false);
       setFormData({ email: '', password: '', displayName: '', role: 'user' });
       fetchUsers();
-    } catch (error: any) {
-      console.error('Error creating user:', error);
-      const msg = error.code === 'auth/email-already-in-use' 
-        ? 'Cet email est déjà utilisé'
-        : 'Erreur lors de la création du compte';
+    } catch (error: unknown) {
+      const err = error as { code?: string };
+      const msg = err.code === 'auth/email-already-in-use' ? 'Cet email est déjà utilisé' : 'Erreur lors de la création du compte';
       toast.error(msg);
     }
   }
 
   async function handleRoleChange(userId: string, newRole: UserRole) {
     try {
-      await updateDoc(doc(db, 'users', userId), { role: newRole });
+      if (isDemoMode) {
+        dataService.demoUpdateUserRole(userId, newRole);
+      } else {
+        await updateDoc(doc(db, 'users', userId), { role: newRole });
+      }
       toast.success('Rôle mis à jour');
       fetchUsers();
     } catch (error) {
@@ -94,7 +72,11 @@ export default function UsersPage() {
   async function handleDeleteUser(userId: string) {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cet utilisateur ?')) return;
     try {
-      await deleteDoc(doc(db, 'users', userId));
+      if (isDemoMode) {
+        dataService.demoDeleteUser(userId);
+      } else {
+        await deleteDoc(doc(db, 'users', userId));
+      }
       toast.success('Utilisateur supprimé');
       fetchUsers();
     } catch (error) {
@@ -112,27 +94,15 @@ export default function UsersPage() {
   };
 
   const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'super_admin': return 'Super Admin';
-      case 'admin': return 'Admin';
-      default: return 'Utilisateur';
-    }
+    switch (role) { case 'super_admin': return 'Super Admin'; case 'admin': return 'Admin'; default: return 'Utilisateur'; }
   };
 
   const getRoleBadge = (role: string) => {
-    switch (role) {
-      case 'super_admin': return 'bg-purple-100 text-purple-700';
-      case 'admin': return 'bg-yellow-100 text-yellow-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
+    switch (role) { case 'super_admin': return 'bg-purple-100 text-purple-700'; case 'admin': return 'bg-yellow-100 text-yellow-700'; default: return 'bg-gray-100 text-gray-700'; }
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-[#C9A125] border-t-transparent rounded-full animate-spin"></div>
-      </div>
-    );
+    return (<div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-[#C9A125] border-t-transparent rounded-full animate-spin"></div></div>);
   }
 
   return (
@@ -142,16 +112,11 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-[#19283E]">Gestion des utilisateurs</h1>
           <p className="text-gray-500 mt-1">{users.length} utilisateur(s) enregistré(s)</p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#C9A125] text-[#19283E] font-medium rounded-lg hover:bg-[#b8921f] transition-colors"
-        >
-          <Plus size={18} />
-          Créer un compte
+        <button onClick={() => setShowCreateModal(true)} className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#C9A125] text-[#19283E] font-medium rounded-lg hover:bg-[#b8921f] transition-colors">
+          <Plus size={18} />Créer un compte
         </button>
       </div>
 
-      {/* Users list */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {users.length === 0 ? (
           <div className="p-12 text-center">
@@ -184,28 +149,19 @@ export default function UsersPage() {
                     <td className="px-4 py-3 text-sm text-gray-600">{user.email}</td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full ${getRoleBadge(user.role)}`}>
-                        {getRoleIcon(user.role)}
-                        {getRoleLabel(user.role)}
+                        {getRoleIcon(user.role)}{getRoleLabel(user.role)}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-gray-500">
-                      {user.createdAt ? new Date(user.createdAt).toLocaleDateString('fr-FR') : '-'}
-                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-500">{user.createdAt ? new Date(user.createdAt).toLocaleDateString('fr-FR') : '-'}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1">
-                        <select
-                          value={user.role}
-                          onChange={(e) => handleRoleChange(user.uid, e.target.value as UserRole)}
-                          className="px-2 py-1 border border-gray-200 rounded text-xs focus:ring-2 focus:ring-[#C9A125] outline-none"
-                        >
+                        <select value={user.role} onChange={(e) => handleRoleChange(user.uid, e.target.value as UserRole)}
+                          className="px-2 py-1 border border-gray-200 rounded text-xs focus:ring-2 focus:ring-[#C9A125] outline-none">
                           <option value="user">Utilisateur</option>
                           <option value="admin">Admin</option>
                           <option value="super_admin">Super Admin</option>
                         </select>
-                        <button
-                          onClick={() => handleDeleteUser(user.uid)}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        >
+                        <button onClick={() => handleDeleteUser(user.uid)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -224,71 +180,36 @@ export default function UsersPage() {
           <div className="bg-white rounded-2xl w-full max-w-md">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
               <h2 className="text-lg font-semibold text-[#19283E]">Créer un compte</h2>
-              <button onClick={() => setShowCreateModal(false)} className="p-1 text-gray-400 hover:text-gray-600">
-                <X size={20} />
-              </button>
+              <button onClick={() => setShowCreateModal(false)} className="p-1 text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
             <form onSubmit={handleCreateUser} className="p-5 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nom complet *</label>
-                <input
-                  type="text"
-                  value={formData.displayName}
-                  onChange={(e) => setFormData({...formData, displayName: e.target.value})}
-                  placeholder="Jean Dupont"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none"
-                  required
-                />
+                <input type="text" value={formData.displayName} onChange={(e) => setFormData({...formData, displayName: e.target.value})}
+                  placeholder="Jean Dupont" className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none" required />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  placeholder="jean.dupont@arena.com"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none"
-                  required
-                />
+                <input type="email" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  placeholder="jean.dupont@arena.com" className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none" required />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Mot de passe *</label>
-                <input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({...formData, password: e.target.value})}
-                  placeholder="Min. 6 caractères"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none"
-                  required
-                  minLength={6}
-                />
+                <input type="password" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  placeholder="Min. 6 caractères" className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none" required minLength={6} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({...formData, role: e.target.value as UserRole})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none"
-                >
+                <select value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value as UserRole})}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none">
                   <option value="user">Utilisateur</option>
                   <option value="admin">Administrateur</option>
                   <option value="super_admin">Super Administrateur</option>
                 </select>
               </div>
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2.5 bg-[#19283E] text-white font-medium rounded-lg hover:bg-[#243552]"
-                >
-                  Créer
-                </button>
+                <button type="button" onClick={() => setShowCreateModal(false)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50">Annuler</button>
+                <button type="submit" className="flex-1 px-4 py-2.5 bg-[#19283E] text-white font-medium rounded-lg hover:bg-[#243552]">Créer</button>
               </div>
             </form>
           </div>

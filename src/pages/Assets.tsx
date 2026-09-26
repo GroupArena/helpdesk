@@ -1,27 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../config/firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { dataService, Asset } from '../config/dataService';
 import toast from 'react-hot-toast';
-import { 
-  Plus, 
-  Edit2, 
-  Trash2, 
-  Search, 
-  X,
-  Package,
-  Filter
-} from 'lucide-react';
-
-interface Asset {
-  id: string;
-  name: string;
-  category: string;
-  quantity: number;
-  location: string;
-  status: string;
-  description?: string;
-}
+import { Plus, Edit2, Trash2, Search, X, Package } from 'lucide-react';
 
 const CATEGORIES = ['Informatique', 'Mobilier', 'Réseau', 'Électronique', 'Autre'];
 const STATUSES = ['Disponible', 'En utilisation', 'En maintenance', 'Hors service'];
@@ -35,27 +16,16 @@ export default function Assets() {
   const [showModal, setShowModal] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [formData, setFormData] = useState({
-    name: '',
-    category: 'Informatique',
-    quantity: 1,
-    location: '',
-    status: 'Disponible',
-    description: ''
+    name: '', category: 'Informatique', quantity: 1, location: '', status: 'Disponible', description: ''
   });
 
-  useEffect(() => {
-    fetchAssets();
-  }, []);
+  useEffect(() => { fetchAssets(); }, []);
 
   async function fetchAssets() {
     setLoading(true);
     try {
-      const querySnapshot = await getDocs(collection(db, 'assets'));
-      const assetsData = querySnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Asset[];
-      setAssets(assetsData);
+      const data = await dataService.getAssets();
+      setAssets(data);
     } catch (error) {
       console.error('Error fetching assets:', error);
       toast.error('Erreur lors du chargement des actifs');
@@ -66,26 +36,15 @@ export default function Assets() {
 
   function openAddModal() {
     setEditingAsset(null);
-    setFormData({
-      name: '',
-      category: 'Informatique',
-      quantity: 1,
-      location: '',
-      status: 'Disponible',
-      description: ''
-    });
+    setFormData({ name: '', category: 'Informatique', quantity: 1, location: '', status: 'Disponible', description: '' });
     setShowModal(true);
   }
 
   function openEditModal(asset: Asset) {
     setEditingAsset(asset);
     setFormData({
-      name: asset.name,
-      category: asset.category,
-      quantity: asset.quantity,
-      location: asset.location,
-      status: asset.status,
-      description: asset.description || ''
+      name: asset.name, category: asset.category, quantity: asset.quantity,
+      location: asset.location, status: asset.status, description: asset.description || ''
     });
     setShowModal(true);
   }
@@ -96,22 +55,12 @@ export default function Assets() {
       toast.error('Veuillez remplir tous les champs obligatoires');
       return;
     }
-
     try {
       if (editingAsset) {
-        await updateDoc(doc(db, 'assets', editingAsset.id), {
-          ...formData,
-          quantity: Number(formData.quantity),
-          updatedAt: new Date().toISOString()
-        });
+        await dataService.updateAsset(editingAsset.id, { ...formData, quantity: Number(formData.quantity), updatedAt: new Date().toISOString() });
         toast.success('Actif modifié avec succès');
       } else {
-        await addDoc(collection(db, 'assets'), {
-          ...formData,
-          quantity: Number(formData.quantity),
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        });
+        await dataService.addAsset({ ...formData, quantity: Number(formData.quantity), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
         toast.success('Actif ajouté avec succès');
       }
       setShowModal(false);
@@ -125,7 +74,7 @@ export default function Assets() {
   async function handleDelete(id: string) {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cet actif ?')) return;
     try {
-      await deleteDoc(doc(db, 'assets', id));
+      await dataService.deleteAsset(id);
       toast.success('Actif supprimé');
       fetchAssets();
     } catch (error) {
@@ -135,8 +84,7 @@ export default function Assets() {
   }
 
   const filteredAssets = assets.filter(asset => {
-    const matchesSearch = asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      asset.location.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = asset.name.toLowerCase().includes(searchTerm.toLowerCase()) || asset.location.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = !filterCategory || asset.category === filterCategory;
     return matchesSearch && matchesCategory;
   });
@@ -167,10 +115,7 @@ export default function Assets() {
           <p className="text-gray-500 mt-1">{assets.length} actifs enregistrés</p>
         </div>
         {isAdmin && (
-          <button
-            onClick={openAddModal}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#C9A125] text-[#19283E] font-medium rounded-lg hover:bg-[#b8921f] transition-colors"
-          >
+          <button onClick={openAddModal} className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#C9A125] text-[#19283E] font-medium rounded-lg hover:bg-[#b8921f] transition-colors">
             <Plus size={18} />
             Ajouter un actif
           </button>
@@ -182,27 +127,14 @@ export default function Assets() {
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input
-              type="text"
-              placeholder="Rechercher par nom ou emplacement..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none"
-            />
+            <input type="text" placeholder="Rechercher par nom ou emplacement..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none" />
           </div>
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className="pl-10 pr-8 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none appearance-none bg-white"
-            >
-              <option value="">Toutes catégories</option>
-              {CATEGORIES.map(cat => (
-                <option key={cat} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
+          <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}
+            className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none">
+            <option value="">Toutes catégories</option>
+            {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+          </select>
         </div>
       </div>
 
@@ -212,9 +144,6 @@ export default function Assets() {
           <div className="p-12 text-center">
             <Package size={48} className="mx-auto mb-4 text-gray-300" />
             <p className="text-gray-500 font-medium">Aucun actif trouvé</p>
-            <p className="text-gray-400 text-sm mt-1">
-              {searchTerm || filterCategory ? 'Essayez de modifier vos filtres' : 'Commencez par ajouter un actif'}
-            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -226,9 +155,7 @@ export default function Assets() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Quantité</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Emplacement</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">État</th>
-                  {isAdmin && (
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th>
-                  )}
+                  {isAdmin && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -236,37 +163,21 @@ export default function Assets() {
                   <tr key={asset.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-4 py-3">
                       <p className="font-medium text-[#19283E]">{asset.name}</p>
-                      {asset.description && (
-                        <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[200px]">{asset.description}</p>
-                      )}
+                      {asset.description && <p className="text-xs text-gray-400 mt-0.5 truncate max-w-[200px]">{asset.description}</p>}
                     </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{asset.category}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-[#19283E]">{asset.quantity}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{asset.location}</td>
                     <td className="px-4 py-3">
-                      <span className="text-sm text-gray-600">{asset.category}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-sm font-medium text-[#19283E]">{asset.quantity}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="text-sm text-gray-600">{asset.location}</span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getStatusBadge(asset.status)}`}>
-                        {asset.status}
-                      </span>
+                      <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getStatusBadge(asset.status)}`}>{asset.status}</span>
                     </td>
                     {isAdmin && (
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => openEditModal(asset)}
-                            className="p-1.5 text-gray-400 hover:text-[#C9A125] hover:bg-yellow-50 rounded-lg transition-colors"
-                          >
+                          <button onClick={() => openEditModal(asset)} className="p-1.5 text-gray-400 hover:text-[#C9A125] hover:bg-yellow-50 rounded-lg transition-colors">
                             <Edit2 size={16} />
                           </button>
-                          <button
-                            onClick={() => handleDelete(asset.id)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                          >
+                          <button onClick={() => handleDelete(asset.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -285,99 +196,49 @@ export default function Assets() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h2 className="text-lg font-semibold text-[#19283E]">
-                {editingAsset ? 'Modifier l\'actif' : 'Ajouter un actif'}
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="p-1 text-gray-400 hover:text-gray-600 rounded-lg"
-              >
-                <X size={20} />
-              </button>
+              <h2 className="text-lg font-semibold text-[#19283E]">{editingAsset ? "Modifier l'actif" : 'Ajouter un actif'}</h2>
+              <button onClick={() => setShowModal(false)} className="p-1 text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  placeholder="Ex: Souris Logitech MX Master"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none"
-                  required
-                />
+                <input type="text" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})}
+                  placeholder="Ex: Souris Logitech MX Master" className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none" required />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none"
-                  >
-                    {CATEGORIES.map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
+                  <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none">
+                    {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Quantité</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.quantity}
-                    onChange={(e) => setFormData({...formData, quantity: parseInt(e.target.value) || 0})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none"
-                  />
+                  <input type="number" min="0" value={formData.quantity} onChange={(e) => setFormData({...formData, quantity: parseInt(e.target.value) || 0})}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none" />
                 </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Emplacement *</label>
-                <input
-                  type="text"
-                  value={formData.location}
-                  onChange={(e) => setFormData({...formData, location: e.target.value})}
-                  placeholder="Ex: Bureau 201 - Étage 2"
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none"
-                  required
-                />
+                <input type="text" value={formData.location} onChange={(e) => setFormData({...formData, location: e.target.value})}
+                  placeholder="Ex: Bureau 201 - Étage 2" className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none" required />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">État</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({...formData, status: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none"
-                >
-                  {STATUSES.map(status => (
-                    <option key={status} value={status}>{status}</option>
-                  ))}
+                <select value={formData.status} onChange={(e) => setFormData({...formData, status: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none">
+                  {STATUSES.map(status => <option key={status} value={status}>{status}</option>)}
                 </select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({...formData, description: e.target.value})}
-                  placeholder="Description optionnelle..."
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none resize-none"
-                />
+                <textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  placeholder="Description optionnelle..." rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#C9A125] focus:border-transparent outline-none resize-none" />
               </div>
               <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2.5 bg-[#19283E] text-white font-medium rounded-lg hover:bg-[#243552] transition-colors"
-                >
-                  {editingAsset ? 'Modifier' : 'Ajouter'}
-                </button>
+                <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2.5 border border-gray-200 text-gray-700 font-medium rounded-lg hover:bg-gray-50">Annuler</button>
+                <button type="submit" className="flex-1 px-4 py-2.5 bg-[#19283E] text-white font-medium rounded-lg hover:bg-[#243552]">{editingAsset ? 'Modifier' : 'Ajouter'}</button>
               </div>
             </form>
           </div>

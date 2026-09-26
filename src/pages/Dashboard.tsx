@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { db } from '../config/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { dataService, Ticket } from '../config/dataService';
 import { 
-  Ticket, 
+  Ticket as TicketIcon, 
   Package, 
   AlertCircle, 
   CheckCircle2, 
@@ -22,13 +21,9 @@ interface Stats {
 export default function Dashboard() {
   const { userProfile, isAdmin } = useAuth();
   const [stats, setStats] = useState<Stats>({
-    totalTickets: 0,
-    openTickets: 0,
-    inProgressTickets: 0,
-    resolvedTickets: 0,
-    totalAssets: 0
+    totalTickets: 0, openTickets: 0, inProgressTickets: 0, resolvedTickets: 0, totalAssets: 0
   });
-  const [recentTickets, setRecentTickets] = useState<any[]>([]);
+  const [recentTickets, setRecentTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,36 +34,24 @@ export default function Dashboard() {
     if (!userProfile) return;
     setLoading(true);
     try {
-      // Fetch tickets
-      let ticketsQuery;
-      if (isAdmin) {
-        ticketsQuery = query(collection(db, 'tickets'));
-      } else {
-        ticketsQuery = query(collection(db, 'tickets'), where('createdBy', '==', userProfile.uid));
-      }
-      const ticketsSnap = await getDocs(ticketsQuery);
-      const tickets = ticketsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const tickets = await dataService.getTickets(userProfile.uid, isAdmin);
+      const assets = await dataService.getAssets();
 
-      // Fetch assets
-      const assetsSnap = await getDocs(collection(db, 'assets'));
-      const totalAssets = assetsSnap.size;
-
-      const openTickets = tickets.filter((t: any) => t.status === 'open').length;
-      const inProgressTickets = tickets.filter((t: any) => t.status === 'in_progress').length;
-      const resolvedTickets = tickets.filter((t: any) => t.status === 'resolved' || t.status === 'closed').length;
+      const openTickets = tickets.filter(t => t.status === 'open').length;
+      const inProgressTickets = tickets.filter(t => t.status === 'in_progress').length;
+      const resolvedTickets = tickets.filter(t => t.status === 'resolved' || t.status === 'closed').length;
 
       setStats({
         totalTickets: tickets.length,
         openTickets,
         inProgressTickets,
         resolvedTickets,
-        totalAssets
+        totalAssets: assets.length
       });
 
-      // Recent tickets
-      setRecentTickets(tickets.sort((a: any, b: any) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      ).slice(0, 5));
+      setRecentTickets(
+        tickets.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5)
+      );
     } catch (error) {
       console.error('Error fetching stats:', error);
     } finally {
@@ -120,9 +103,7 @@ export default function Dashboard() {
           Bonjour, {userProfile?.displayName} 👋
         </h1>
         <p className="text-gray-500 mt-1">
-          {isAdmin 
-            ? 'Vue d\'ensemble de l\'activité' 
-            : 'Voici le résumé de vos demandes'}
+          {isAdmin ? "Vue d'ensemble de l'activité" : 'Voici le résumé de vos demandes'}
         </p>
       </div>
 
@@ -130,57 +111,17 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {isAdmin ? (
           <>
-            <StatCard
-              icon={<Ticket size={22} />}
-              label="Tickets ouverts"
-              value={stats.openTickets}
-              color="bg-red-50 text-red-600"
-            />
-            <StatCard
-              icon={<Clock size={22} />}
-              label="En cours"
-              value={stats.inProgressTickets}
-              color="bg-yellow-50 text-yellow-600"
-            />
-            <StatCard
-              icon={<CheckCircle2 size={22} />}
-              label="Résolus"
-              value={stats.resolvedTickets}
-              color="bg-green-50 text-green-600"
-            />
-            <StatCard
-              icon={<Package size={22} />}
-              label="Total actifs"
-              value={stats.totalAssets}
-              color="bg-blue-50 text-blue-600"
-            />
+            <StatCard icon={<TicketIcon size={22} />} label="Tickets ouverts" value={stats.openTickets} color="bg-red-50 text-red-600" />
+            <StatCard icon={<Clock size={22} />} label="En cours" value={stats.inProgressTickets} color="bg-yellow-50 text-yellow-600" />
+            <StatCard icon={<CheckCircle2 size={22} />} label="Résolus" value={stats.resolvedTickets} color="bg-green-50 text-green-600" />
+            <StatCard icon={<Package size={22} />} label="Total actifs" value={stats.totalAssets} color="bg-blue-50 text-blue-600" />
           </>
         ) : (
           <>
-            <StatCard
-              icon={<Ticket size={22} />}
-              label="Mes tickets"
-              value={stats.totalTickets}
-              color="bg-blue-50 text-blue-600"
-            />
-            <StatCard
-              icon={<AlertCircle size={22} />}
-              label="En attente"
-              value={stats.openTickets}
-              color="bg-red-50 text-red-600"
-            />
-            <StatCard
-              icon={<Clock size={22} />}
-              label="En cours"
-              value={stats.inProgressTickets}
-              color="bg-yellow-50 text-yellow-600"
-            />
-            <StatCard
-              icon={<CheckCircle2 size={22} />}
-              label="Résolus"
-              value={stats.resolvedTickets}
-              color="bg-green-50 text-green-600"
-            />
+            <StatCard icon={<TicketIcon size={22} />} label="Mes tickets" value={stats.totalTickets} color="bg-blue-50 text-blue-600" />
+            <StatCard icon={<AlertCircle size={22} />} label="En attente" value={stats.openTickets} color="bg-red-50 text-red-600" />
+            <StatCard icon={<Clock size={22} />} label="En cours" value={stats.inProgressTickets} color="bg-yellow-50 text-yellow-600" />
+            <StatCard icon={<CheckCircle2 size={22} />} label="Résolus" value={stats.resolvedTickets} color="bg-green-50 text-green-600" />
           </>
         )}
       </div>
@@ -195,17 +136,17 @@ export default function Dashboard() {
         </div>
         {recentTickets.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
-            <Ticket size={40} className="mx-auto mb-3 text-gray-300" />
+            <TicketIcon size={40} className="mx-auto mb-3 text-gray-300" />
             <p>Aucun ticket pour le moment</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
-            {recentTickets.map((ticket: any) => (
+            {recentTickets.map((ticket) => (
               <div key={ticket.id} className="p-4 hover:bg-gray-50 transition-colors">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-[#19283E] truncate">{ticket.title}</p>
-                    <div className="flex items-center gap-3 mt-1">
+                    <div className="flex items-center gap-3 mt-1 flex-wrap">
                       <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getStatusColor(ticket.status)}`}>
                         {getStatusLabel(ticket.status)}
                       </span>
@@ -213,7 +154,7 @@ export default function Dashboard() {
                         {ticket.priority === 'high' ? 'Haute' : ticket.priority === 'medium' ? 'Moyenne' : 'Basse'}
                       </span>
                       <span className="text-xs text-gray-400">
-                        {new Date(ticket.createdAt?.toDate?.() || ticket.createdAt).toLocaleDateString('fr-FR')}
+                        {new Date(ticket.createdAt).toLocaleDateString('fr-FR')}
                       </span>
                     </div>
                   </div>

@@ -25,29 +25,12 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route 
-        path="/login" 
-        element={currentUser ? <Navigate to="/" replace /> : <Login />} 
-      />
-      <Route
-        path="/"
-        element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }
-      >
+      <Route path="/login" element={currentUser ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="assets" element={<Assets />} />
         <Route path="tickets" element={<Tickets />} />
-        <Route 
-          path="users" 
-          element={
-            <ProtectedRoute allowedRoles={['super_admin']}>
-              <UsersPage />
-            </ProtectedRoute>
-          } 
-        />
+        <Route path="users" element={<ProtectedRoute allowedRoles={['super_admin']}><UsersPage /></ProtectedRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -63,18 +46,8 @@ function App() {
           position="top-right"
           toastOptions={{
             duration: 3000,
-            style: {
-              background: '#19283E',
-              color: '#fff',
-              borderRadius: '12px',
-              fontSize: '14px',
-            },
-            success: {
-              iconTheme: {
-                primary: '#C9A125',
-                secondary: '#fff',
-              },
-            },
+            style: { background: '#19283E', color: '#fff', borderRadius: '12px', fontSize: '14px' },
+            success: { iconTheme: { primary: '#C9A125', secondary: '#fff' } },
           }}
         />
       </AuthProvider>
