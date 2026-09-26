@@ -130,32 +130,65 @@ Après le déploiement, vous devez créer le premier compte Super Admin manuelle
 }
 ```
 
-## 📦 Déploiement sur Google Drive
+## 📦 Déploiement sur GitHub Pages
 
-### Build de production
+### Configuration automatique (recommandé)
+
+Le projet est déjà configuré pour un déploiement automatique via **GitHub Actions** :
+
+1. **Créez un repository GitHub** pour votre projet
+2. **Poussez le code** sur la branche `main` :
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git branch -M main
+   git remote add origin https://github.com/VOTRE_USERNAME/VOTRE_REPO.git
+   git push -u origin main
+   ```
+
+3. **Activez GitHub Pages** dans les paramètres du repository :
+   - Allez dans **Settings** > **Pages**
+   - Sous **Source**, sélectionnez **GitHub Actions**
+   - Le workflow va automatiquement se déclencher à chaque push sur `main`
+
+4. **Accédez à votre site** :
+   - URL : `https://VOTRE_USERNAME.github.io/VOTRE_REPO/`
+   - Le déploiement prend environ 1-2 minutes
+
+### Configuration manuelle
+
+Si vous préférez déployer manuellement :
 
 ```bash
+# Build de production
 npm run build
+
+# Le dossier dist/ contient tous les fichiers statiques
+# Uploadez son contenu sur GitHub Pages ou tout autre hébergeur statique
 ```
 
-Le dossier `dist/` contient tous les fichiers statiques.
+### Configuration des secrets Firebase
 
-### Upload sur Google Drive
+Pour que le déploiement automatique fonctionne, vous devez configurer les variables Firebase dans GitHub :
 
-1. Uploadez **tout le contenu** du dossier `dist/` dans un dossier Google Drive
-2. Rendez le dossier **public** (Partager > "Tous les utilisateurs disposant du lien")
-3. Utilisez un service comme [DriveToWeb](https://drv.tw) pour héberger le site :
-   - Allez sur https://drv.tw
-   - Connectez-vous avec votre compte Google
-   - Sélectionnez le dossier contenant les fichiers
-   - Vous obtiendrez une URL publique
+1. Allez dans **Settings** > **Secrets and variables** > **Actions**
+2. Cliquez sur **New repository secret**
+3. Ajoutez les secrets suivants (valeurs disponibles dans Firebase Console > Paramètres du projet) :
+   - `VITE_FIREBASE_API_KEY`
+   - `VITE_FIREBASE_AUTH_DOMAIN`
+   - `VITE_FIREBASE_PROJECT_ID`
+   - `VITE_FIREBASE_STORAGE_BUCKET`
+   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+   - `VITE_FIREBASE_APP_ID`
 
-### Alternative : GitHub Pages (recommandé)
+### Notes importantes
 
-Pour une meilleure expérience, utilisez GitHub Pages :
-1. Créez un repo GitHub
-2. Poussez le contenu de `dist/` dans la branche `gh-pages`
-3. Activez GitHub Pages dans les paramètres du repo
+- **HashRouter** est utilisé pour éviter les erreurs 404 lors du rafraîchissement
+- Les chemins des assets sont **relatifs** (`./assets/...`) pour fonctionner quel que soit le nom du repo
+- Le workflow GitHub Actions est dans `.github/workflows/deploy.yml`
+- Les variables Firebase sont injectées via les secrets GitHub lors du build
+- Pour le développement local, créez un fichier `.env` basé sur `.env.example`
 
 ## 🛠️ Stack technique
 
