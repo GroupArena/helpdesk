@@ -4,7 +4,7 @@ import { dataService, Ticket, Comment } from '../config/dataService';
 import toast from 'react-hot-toast';
 import { Plus, Search, Ticket as TicketIcon, X, MessageSquare, ChevronRight, Clock, AlertCircle, CheckCircle2, Download } from 'lucide-react';
 
-const CATEGORIES = ['Mobilier', 'Informatique', 'Réseau', 'Autre'];
+const CATEGORIES = ['Mobilier', 'Informatique', 'Électrique et Électronique', 'Réseau', 'Autre'];
 const PRIORITIES = ['low', 'medium', 'high'];
 const STATUSES = ['open', 'in_progress', 'resolved', 'closed'];
 

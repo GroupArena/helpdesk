@@ -53,7 +53,7 @@ export default function Login() {
             className="w-20 h-20 mx-auto mb-4 rounded-2xl"
           />
           <h1 className="text-2xl font-bold text-white">ARENA Group</h1>
-          <p className="text-gray-400 mt-1">Gestion de parc & Helpdesk</p>
+          <p className="text-gray-400 mt-1">Helpdesk</p>
         </div>
 
         {/* Login form */}
@@ -149,7 +149,7 @@ export default function Login() {
         )}
 
         <p className="text-center text-gray-500 text-xs mt-6">
-          © 2024 Groupe ARENA - Tous droits réservés
+          © 2026 ARENA Group - Tous droits réservés
         </p>
       </div>
     </div>
