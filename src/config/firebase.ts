@@ -21,7 +21,7 @@ const firebaseConfig = {
 };
 
 // Détection automatique : si les clés sont encore par défaut, on est en mode démo
-export const isDemoMode = firebaseConfig.apiKey === "AIzaSyCmZBIqxLActosAXX2h4KR8Ork5RpoqZk4";
+export const isDemoMode = firebaseConfig.apiKey === "YOUR_API_KEY_HERE";
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
