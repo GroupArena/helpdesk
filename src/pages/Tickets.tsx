@@ -2,11 +2,76 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dataService, Ticket, Comment } from '../config/dataService';
 import toast from 'react-hot-toast';
-import { Plus, Search, Ticket as TicketIcon, X, MessageSquare, ChevronRight, Clock, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Plus, Search, Ticket as TicketIcon, X, MessageSquare, ChevronRight, Clock, AlertCircle, CheckCircle2, Download } from 'lucide-react';
 
 const CATEGORIES = ['Mobilier', 'Informatique', 'Réseau', 'Autre'];
 const PRIORITIES = ['low', 'medium', 'high'];
 const STATUSES = ['open', 'in_progress', 'resolved', 'closed'];
+
+// Fonction d'export CSV
+function exportToCSV(tickets: Ticket[]) {
+  const headers = [
+    'ID',
+    'Titre',
+    'Description',
+    'Catégorie',
+    'Priorité',
+    'Statut',
+    'Créé par',
+    'Assigné à',
+    'Date de création',
+    'Date de mise à jour',
+    'Nombre de commentaires'
+  ];
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'open': return 'Ouvert';
+      case 'in_progress': return 'En cours';
+      case 'resolved': return 'Résolu';
+      case 'closed': return 'Fermé';
+      default: return status;
+    }
+  };
+
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'Haute';
+      case 'medium': return 'Moyenne';
+      case 'low': return 'Basse';
+      default: return priority;
+    }
+  };
+
+  const rows = tickets.map(ticket => [
+    ticket.id,
+    ticket.title,
+    ticket.description.replace(/"/g, '""'),
+    ticket.category,
+    getPriorityLabel(ticket.priority),
+    getStatusLabel(ticket.status),
+    ticket.createdByName,
+    ticket.assignedToName || 'Non assigné',
+    new Date(ticket.createdAt).toLocaleDateString('fr-FR'),
+    new Date(ticket.updatedAt).toLocaleDateString('fr-FR'),
+    (ticket.comments || []).length.toString()
+  ]);
+
+  const csvContent = [
+    headers.join(';'),
+    ...rows.map(row => row.map(cell => `"${cell}"`).join(';'))
+  ].join('\n');
+
+  const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `tickets_arena_${new Date().toISOString().split('T')[0]}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
 
 export default function Tickets() {
   const { userProfile, isAdmin } = useAuth();
@@ -130,9 +195,18 @@ export default function Tickets() {
           <h1 className="text-2xl font-bold text-[#19283E]">Tickets d'intervention</h1>
           <p className="text-gray-500 mt-1">{isAdmin ? `${tickets.length} tickets au total` : `Mes ${tickets.length} ticket(s)`}</p>
         </div>
-        <button onClick={() => setShowCreateModal(true)} className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#C9A125] text-[#19283E] font-medium rounded-lg hover:bg-[#b8921f] transition-colors">
-          <Plus size={18} />Nouveau ticket
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => exportToCSV(filteredTickets)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-[#19283E] font-medium rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Download size={18} />
+            Exporter CSV
+          </button>
+          <button onClick={() => setShowCreateModal(true)} className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#C9A125] text-[#19283E] font-medium rounded-lg hover:bg-[#b8921f] transition-colors">
+            <Plus size={18} />Nouveau ticket
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -237,17 +311,19 @@ export default function Tickets() {
       {showDetailModal && selectedTicket && (
         <TicketDetailModal ticket={selectedTicket} isAdmin={isAdmin} userProfile={userProfile}
           onClose={() => { setShowDetailModal(false); setSelectedTicket(null); }}
-          onStatusChange={handleStatusChange} onAssign={handleAssign} onDelete={handleDeleteTicket} onCommentAdded={fetchTickets} />
+          onStatusChange={handleStatusChange} onAssign={handleAssign} onDelete={handleDeleteTicket} onCommentAdded={fetchTickets}
+          onTicketUpdate={(updatedTicket) => setSelectedTicket(updatedTicket)} />
       )}
     </div>
   );
 }
 
 // Ticket Detail Modal Component
-function TicketDetailModal({ ticket, isAdmin, userProfile, onClose, onStatusChange, onAssign, onDelete, onCommentAdded }: {
+function TicketDetailModal({ ticket, isAdmin, userProfile, onClose, onStatusChange, onAssign, onDelete, onCommentAdded, onTicketUpdate }: {
   ticket: Ticket; isAdmin: boolean; userProfile: { uid: string; displayName: string } | null;
   onClose: () => void; onStatusChange: (id: string, status: string) => void;
   onAssign: (id: string, assignee: string) => void; onDelete: (id: string) => void; onCommentAdded: () => void;
+  onTicketUpdate: (ticket: Ticket) => void;
 }) {
   const [newComment, setNewComment] = useState('');
   const [assignee, setAssignee] = useState('');
@@ -265,6 +341,11 @@ function TicketDetailModal({ ticket, isAdmin, userProfile, onClose, onStatusChan
       const comment: Comment = { id: Date.now().toString(), text: newComment, author: userProfile.uid, authorName: userProfile.displayName, createdAt: new Date().toISOString() };
       const updatedComments = [...(ticket.comments || []), comment];
       await dataService.updateTicket(ticket.id, { comments: updatedComments, updatedAt: new Date().toISOString() });
+      
+      // Mettre à jour le ticket localement pour affichage immédiat
+      const updatedTicket = { ...ticket, comments: updatedComments, updatedAt: new Date().toISOString() };
+      onTicketUpdate(updatedTicket);
+      
       setNewComment('');
       toast.success('Commentaire ajouté');
       onCommentAdded();

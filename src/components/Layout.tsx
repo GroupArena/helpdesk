@@ -25,7 +25,7 @@ export default function Layout() {
 
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard', roles: ['super_admin', 'admin', 'user'] },
-    { to: '/assets', icon: Package, label: 'Actifs / Inventaire', roles: ['super_admin', 'admin', 'user'] },
+    { to: '/assets', icon: Package, label: 'Actifs / Inventaire', roles: ['super_admin', 'admin'] },
     { to: '/tickets', icon: Ticket, label: 'Tickets', roles: ['super_admin', 'admin', 'user'] },
     { to: '/users', icon: Users, label: 'Utilisateurs', roles: ['super_admin'] },
   ];
@@ -60,11 +60,13 @@ export default function Layout() {
       `}>
         <div className="flex items-center justify-between p-4 border-b border-white/10">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#C9A125] rounded-lg flex items-center justify-center font-bold text-[#19283E]">
-              A
-            </div>
+            <img 
+              src="./logo-arena.svg" 
+              alt="Groupe ARENA" 
+              className="w-8 h-8 rounded-lg"
+            />
             <div>
-              <h1 className="font-bold text-sm">Groupe ARENA</h1>
+              <h1 className="font-bold text-sm">ARENA Group</h1>
               <p className="text-xs text-gray-400">Helpdesk & Inventaire</p>
             </div>
           </div>

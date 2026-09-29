@@ -17,10 +17,16 @@ export interface UserProfile {
 
 export interface Asset {
   id: string;
+  articleNumber: string;
   name: string;
   category: string;
   quantity: number;
-  location: string;
+  emplacement: string;
+  lieu: string;
+  serialNumber: string;
+  fournisseur: string;
+  proprietaire: string;
+  price: string;
   status: string;
   description?: string;
   createdAt?: string;
@@ -62,16 +68,56 @@ const DEMO_KEYS = {
   currentUser: 'arena_demo_current_user',
 };
 
-// Données de démo initiales
+// Données de démo initiales avec les nouveaux champs
 const DEFAULT_ASSETS: Asset[] = [
-  { id: '1', name: 'Dell Latitude 5540', category: 'Informatique', quantity: 15, location: 'Stock IT - Bureau 101', status: 'Disponible', description: 'Laptop professionnel 15 pouces' },
-  { id: '2', name: 'Écran Dell 27" U2723QE', category: 'Informatique', quantity: 8, location: 'Stock IT - Bureau 101', status: 'Disponible', description: 'Écran 4K USB-C' },
-  { id: '3', name: 'Souris Logitech MX Master 3', category: 'Informatique', quantity: 25, location: 'Stock IT - Bureau 101', status: 'Disponible', description: 'Souris ergonomique sans fil' },
-  { id: '4', name: 'Clavier Logitech MX Keys', category: 'Informatique', quantity: 20, location: 'Stock IT - Bureau 101', status: 'Disponible', description: 'Clavier sans fil rétroéclairé' },
-  { id: '5', name: 'Chaise ergonomique Herman Miller', category: 'Mobilier', quantity: 5, location: 'Stock Moyens Généraux', status: 'Disponible', description: 'Chaise de bureau premium' },
-  { id: '6', name: 'Câble réseau Cat6 3m', category: 'Réseau', quantity: 50, location: 'Stock IT - Bureau 101', status: 'Disponible', description: 'Câble Ethernet blindé' },
-  { id: '7', name: 'Switch Cisco 24 ports', category: 'Réseau', quantity: 3, location: 'Salle serveur', status: 'En utilisation', description: 'Switch manageable Gigabit' },
-  { id: '8', name: 'Bureau assis-debout', category: 'Mobilier', quantity: 2, location: 'Stock Moyens Généraux', status: 'En maintenance', description: 'Bureau électrique réglable' },
+  {
+    id: '1', articleNumber: 'INF_CH01_ABK_ABC_0001', name: 'DELL LATITUDE 5540', category: 'Informatique',
+    quantity: 1, emplacement: 'Client Hub 01', lieu: 'Ambatonakanga', serialNumber: 'R9-00186',
+    fournisseur: 'Super 034 50 677 48', proprietaire: 'Arena Business Center', price: '620 000',
+    status: 'Disponible', description: 'Laptop professionnel 15 pouces'
+  },
+  {
+    id: '2', articleNumber: 'INF_CH01_ABK_ABC_0002', name: 'DELL LATITUDE 5540', category: 'Informatique',
+    quantity: 1, emplacement: 'Client Hub 01', lieu: 'Ambatonakanga', serialNumber: 'R9-00784',
+    fournisseur: 'Super 034 50 677 48', proprietaire: 'Arena Business Center', price: '650 000',
+    status: 'Disponible', description: 'Laptop professionnel 15 pouces'
+  },
+  {
+    id: '3', articleNumber: 'INF_WS05_ABR_AGP_0001', name: 'Écran Dell 27" U2723QE', category: 'Informatique',
+    quantity: 1, emplacement: 'Working Space 05', lieu: 'Ambatoroka', serialNumber: 'CN-04V7V2',
+    fournisseur: 'OrdiTech 034 35 123 45', proprietaire: 'Arena Group', price: '1 800 000',
+    status: 'En utilisation', description: 'Écran 4K USB-C'
+  },
+  {
+    id: '4', articleNumber: 'INF_WS05_ABR_AGP_0002', name: 'Souris Logitech MX Master 3', category: 'Informatique',
+    quantity: 1, emplacement: 'Working Space 05', lieu: 'Ambatoroka', serialNumber: 'LOG-MX3-2024-001',
+    fournisseur: 'Logitech Pro 034 22 334 56', proprietaire: 'Arena Group', price: '350 000',
+    status: 'Disponible', description: 'Souris ergonomique sans fil'
+  },
+  {
+    id: '5', articleNumber: 'MOB_MR01_TSI_IMC_0001', name: 'Chaise ergonomique Herman Miller', category: 'Mobilier',
+    quantity: 1, emplacement: 'Meeting Room 01', lieu: 'Tsimbazaza', serialNumber: 'HM-AER-2023-445',
+    fournisseur: 'Mobilier Pro 034 11 223 34', proprietaire: 'Improveo', price: '4 500 000',
+    status: 'Disponible', description: 'Chaise de bureau premium'
+  },
+  {
+    id: '6', articleNumber: 'RES_WK01_ABR_AGP_0001', name: 'Câble réseau Cat6 3m', category: 'Réseau',
+    quantity: 50, emplacement: 'Workshop 01', lieu: 'Ambatoroka', serialNumber: 'n/a',
+    fournisseur: 'Câble Express 034 44 556 67', proprietaire: 'Arena Group', price: '15 000',
+    status: 'Disponible', description: 'Câble Ethernet blindé (lot de 50)'
+  },
+  {
+    id: '7', articleNumber: 'RES_WK01_ABR_AGP_0002', name: 'Switch Cisco 24 ports', category: 'Réseau',
+    quantity: 1, emplacement: 'Workshop 01', lieu: 'Ambatoroka', serialNumber: 'CSC-SW24-2023-089',
+    fournisseur: 'Cisco Partner 034 55 667 78', proprietaire: 'Arena Group', price: '2 800 000',
+    status: 'En utilisation', description: 'Switch manageable Gigabit'
+  },
+  {
+    id: '8', articleNumber: 'MOB_WS10_ASZ_MEA_0001', name: 'Bureau assis-debout', category: 'Mobilier',
+    quantity: 1, emplacement: 'Working Space 10', lieu: 'Anosizato', serialNumber: 'n/a',
+    fournisseur: 'n/a', proprietaire: 'Maison & Artisanat', price: '3 200 000',
+    status: 'En maintenance', description: 'Bureau électrique réglable'
+  },
 ];
 
 const DEFAULT_TICKETS: Ticket[] = [

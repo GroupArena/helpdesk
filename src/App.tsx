@@ -28,7 +28,7 @@ function AppRoutes() {
       <Route path="/login" element={currentUser ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
-        <Route path="assets" element={<Assets />} />
+        <Route path="assets" element={<ProtectedRoute allowedRoles={['super_admin', 'admin']}><Assets /></ProtectedRoute>} />
         <Route path="tickets" element={<Tickets />} />
         <Route path="users" element={<ProtectedRoute allowedRoles={['super_admin']}><UsersPage /></ProtectedRoute>} />
       </Route>

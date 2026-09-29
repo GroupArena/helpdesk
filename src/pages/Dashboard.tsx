@@ -35,7 +35,13 @@ export default function Dashboard() {
     setLoading(true);
     try {
       const tickets = await dataService.getTickets(userProfile.uid, isAdmin);
-      const assets = await dataService.getAssets();
+      
+      // Ne charger les actifs que pour les admins
+      let totalAssets = 0;
+      if (isAdmin) {
+        const assets = await dataService.getAssets();
+        totalAssets = assets.length;
+      }
 
       const openTickets = tickets.filter(t => t.status === 'open').length;
       const inProgressTickets = tickets.filter(t => t.status === 'in_progress').length;
@@ -46,7 +52,7 @@ export default function Dashboard() {
         openTickets,
         inProgressTickets,
         resolvedTickets,
-        totalAssets: assets.length
+        totalAssets
       });
 
       setRecentTickets(
@@ -100,7 +106,7 @@ export default function Dashboard() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#19283E]">
-          Bonjour, {userProfile?.displayName} 👋
+          Bonjour, {userProfile?.displayName}
         </h1>
         <p className="text-gray-500 mt-1">
           {isAdmin ? "Vue d'ensemble de l'activité" : 'Voici le résumé de vos demandes'}

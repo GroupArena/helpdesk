@@ -47,10 +47,12 @@ export default function Login() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-[#C9A125] rounded-2xl mb-4">
-            <span className="text-2xl font-bold text-[#19283E]">A</span>
-          </div>
-          <h1 className="text-2xl font-bold text-white">Groupe ARENA</h1>
+          <img 
+            src="./logo-arena.svg" 
+            alt="Groupe ARENA" 
+            className="w-20 h-20 mx-auto mb-4 rounded-2xl"
+          />
+          <h1 className="text-2xl font-bold text-white">ARENA Group</h1>
           <p className="text-gray-400 mt-1">Gestion de parc & Helpdesk</p>
         </div>
 
