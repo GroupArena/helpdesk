@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dataService, Ticket, Comment } from '../config/dataService';
+import { useNotifications } from '../contexts/NotificationContext';
+import { isDemoMode, db } from '../config/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { Plus, Search, Ticket as TicketIcon, X, MessageSquare, ChevronRight, Clock, AlertCircle, CheckCircle2, Download } from 'lucide-react';
 
@@ -75,6 +78,7 @@ function exportToCSV(tickets: Ticket[]) {
 
 export default function Tickets() {
   const { userProfile, isAdmin } = useAuth();
+  const { addNotification } = useNotifications();
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -85,7 +89,39 @@ export default function Tickets() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [formData, setFormData] = useState({ title: '', description: '', category: 'Informatique', priority: 'medium' });
 
-  useEffect(() => { fetchTickets(); }, [userProfile]);
+  // Listener temps réel pour les tickets
+  useEffect(() => {
+    if (!userProfile) return;
+    setLoading(true);
+
+    if (isDemoMode) {
+      // Mode démo : charger une fois
+      fetchTickets();
+    } else {
+      // Mode Firebase : écouter en temps réel
+      let q;
+      if (isAdmin) {
+        q = query(collection(db, 'tickets'));
+      } else {
+        q = query(collection(db, 'tickets'), where('createdBy', '==', userProfile.uid));
+      }
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const data = snapshot.docs.map(d => ({
+          id: d.id,
+          ...d.data()
+        })) as Ticket[];
+        setTickets(data.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+        setLoading(false);
+      }, (error) => {
+        console.error('Error listening to tickets:', error);
+        toast.error('Erreur de synchronisation');
+        setLoading(false);
+      });
+
+      return () => unsubscribe();
+    }
+  }, [userProfile, isAdmin]);
 
   async function fetchTickets() {
     if (!userProfile) return;
@@ -125,9 +161,27 @@ export default function Tickets() {
 
   async function handleStatusChange(ticketId: string, newStatus: string) {
     try {
+      const oldTicket = tickets.find(t => t.id === ticketId);
       await dataService.updateTicket(ticketId, { status: newStatus, updatedAt: new Date().toISOString() });
       toast.success('Statut mis à jour');
-      fetchTickets();
+      
+      // Créer une notification pour le créateur du ticket
+      if (oldTicket && oldTicket.createdBy !== userProfile?.uid) {
+        const statusLabels: Record<string, string> = {
+          'open': 'Ouvert',
+          'in_progress': 'En cours',
+          'resolved': 'Résolu',
+          'closed': 'Fermé'
+        };
+        await addNotification({
+          userId: oldTicket.createdBy,
+          type: 'status_change',
+          message: `Votre ticket a été modifié en "${statusLabels[newStatus]}"`,
+          ticketId: ticketId,
+          ticketTitle: oldTicket.title
+        });
+      }
+      
       if (selectedTicket?.id === ticketId) {
         setSelectedTicket({ ...selectedTicket, status: newStatus });
       }
@@ -325,6 +379,7 @@ function TicketDetailModal({ ticket, isAdmin, userProfile, onClose, onStatusChan
   onAssign: (id: string, assignee: string) => void; onDelete: (id: string) => void; onCommentAdded: () => void;
   onTicketUpdate: (ticket: Ticket) => void;
 }) {
+  const { addNotification } = useNotifications();
   const [newComment, setNewComment] = useState('');
   const [assignee, setAssignee] = useState('');
 
@@ -345,6 +400,22 @@ function TicketDetailModal({ ticket, isAdmin, userProfile, onClose, onStatusChan
       // Mettre à jour le ticket localement pour affichage immédiat
       const updatedTicket = { ...ticket, comments: updatedComments, updatedAt: new Date().toISOString() };
       onTicketUpdate(updatedTicket);
+      
+      // Créer une notification pour le créateur du ticket (si ce n'est pas lui-même)
+      if (ticket.createdBy !== userProfile.uid) {
+        await addNotification({
+          userId: ticket.createdBy,
+          type: 'comment',
+          message: `${userProfile.displayName} a ajouté un commentaire au ticket`,
+          ticketId: ticket.id,
+          ticketTitle: ticket.title
+        });
+      }
+      
+      // Notifier aussi les admins si un utilisateur commente
+      if (!isAdmin && ticket.createdBy === userProfile.uid) {
+        // L'utilisateur commente son propre ticket, pas de notif supplémentaire
+      }
       
       setNewComment('');
       toast.success('Commentaire ajouté');

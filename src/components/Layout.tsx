@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { isDemoMode } from '../config/firebase';
+import { NotificationProvider } from '../contexts/NotificationContext';
+import NotificationBell from './NotificationBell';
 import { 
   LayoutDashboard, 
   Package, 
@@ -62,7 +64,7 @@ export default function Layout() {
           <div className="flex items-center gap-2">
             <img 
               src="./logo-arena.svg" 
-              alt="Groupe ARENA" 
+              alt="ARENA Group" 
               className="w-8 h-8 rounded-lg"
             />
             <div>
@@ -137,6 +139,12 @@ export default function Layout() {
               <Menu size={24} />
             </button>
             <div className="flex items-center gap-3 ml-auto">
+              {/* Notification Bell */}
+              {userProfile && (
+                <NotificationProvider userId={userProfile.uid}>
+                  <NotificationBell />
+                </NotificationProvider>
+              )}
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-[#19283E]">{userProfile?.displayName}</p>
                 <p className="text-xs text-gray-500">{userProfile?.email}</p>
