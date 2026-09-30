@@ -79,13 +79,18 @@ function exportToCSV(tickets: Ticket[]) {
 
 // Fonction pour récupérer tous les admins
 async function getAllAdmins(): Promise<{ uid: string; displayName: string }[]> {
-  if (isDemoMode) {
-    const users = dataService.demoGetUsers();
-    return users.filter(u => u.role === 'admin' || u.role === 'super_admin').map(u => ({ uid: u.uid, displayName: u.displayName }));
-  } else {
-    const q = query(collection(db, 'users'), where('role', 'in', ['admin', 'super_admin']));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(d => ({ uid: d.id, displayName: d.data().displayName || 'Admin' }));
+  try {
+    if (isDemoMode) {
+      const users = dataService.demoGetUsers();
+      return users.filter(u => u.role === 'admin' || u.role === 'super_admin').map(u => ({ uid: u.uid, displayName: u.displayName }));
+    } else {
+      const q = query(collection(db, 'users'), where('role', 'in', ['admin', 'super_admin']));
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({ uid: d.id, displayName: d.data().displayName || 'Admin' }));
+    }
+  } catch (error) {
+    console.error('Error fetching admins:', error);
+    return []; // Retourner une liste vide en cas d'erreur
   }
 }
 
@@ -178,17 +183,26 @@ export default function Tickets() {
       toast.success('Ticket créé avec succès');
 
       // Notifier tous les admins de la création du ticket
-      const admins = await getAllAdmins();
-      for (const admin of admins) {
-        if (admin.uid !== userProfile?.uid) {
-          await addNotification({
-            userId: admin.uid,
-            type: 'status_change',
-            message: `${userProfile?.displayName} a créé un nouveau ticket`,
-            ticketId: (newTicket as unknown as { id?: string })?.id || '',
-            ticketTitle: formData.title
-          });
+      try {
+        const admins = await getAllAdmins();
+        for (const admin of admins) {
+          if (admin.uid !== userProfile?.uid) {
+            const ticketResult = newTicket as Record<string, unknown> | null | undefined;
+            const ticketId = ticketResult && typeof ticketResult === 'object' && 'id' in ticketResult
+              ? String(ticketResult.id ?? '')
+              : '';
+            await addNotification({
+              userId: admin.uid,
+              type: 'status_change',
+              message: `${userProfile?.displayName} a créé un nouveau ticket`,
+              ticketId,
+              ticketTitle: formData.title
+            });
+          }
         }
+      } catch (notifError) {
+        console.error('Error sending notifications:', notifError);
+        // Continuer même si les notifications échouent
       }
 
       setShowCreateModal(false);
@@ -213,29 +227,35 @@ export default function Tickets() {
         'closed': 'Fermé'
       };
 
-      // Notifier le créateur du ticket
-      if (oldTicket && oldTicket.createdBy !== userProfile?.uid) {
-        await addNotification({
-          userId: oldTicket.createdBy,
-          type: 'status_change',
-          message: `Votre ticket a été modifié en "${statusLabels[newStatus]}"`,
-          ticketId: ticketId,
-          ticketTitle: oldTicket.title
-        });
-      }
-
-      // Notifier tous les admins
-      const admins = await getAllAdmins();
-      for (const admin of admins) {
-        if (admin.uid !== userProfile?.uid && (!oldTicket || admin.uid !== oldTicket.createdBy)) {
+      // Envoyer les notifications (ne pas bloquer si ça échoue)
+      try {
+        // Notifier le créateur du ticket
+        if (oldTicket && oldTicket.createdBy !== userProfile?.uid) {
           await addNotification({
-            userId: admin.uid,
+            userId: oldTicket.createdBy,
             type: 'status_change',
-            message: `Le ticket "${oldTicket?.title}" a été modifié en "${statusLabels[newStatus]}"`,
+            message: `Votre ticket a été modifié en "${statusLabels[newStatus]}"`,
             ticketId: ticketId,
-            ticketTitle: oldTicket?.title || ''
+            ticketTitle: oldTicket.title
           });
         }
+
+        // Notifier tous les admins
+        const admins = await getAllAdmins();
+        for (const admin of admins) {
+          if (admin.uid !== userProfile?.uid && (!oldTicket || admin.uid !== oldTicket.createdBy)) {
+            await addNotification({
+              userId: admin.uid,
+              type: 'status_change',
+              message: `Le ticket "${oldTicket?.title}" a été modifié en "${statusLabels[newStatus]}"`,
+              ticketId: ticketId,
+              ticketTitle: oldTicket?.title || ''
+            });
+          }
+        }
+      } catch (notifError) {
+        console.error('Error sending status notifications:', notifError);
+        // Continuer même si les notifications échouent
       }
 
       if (selectedTicket?.id === ticketId) {
@@ -457,29 +477,35 @@ function TicketDetailModal({ ticket, isAdmin, userProfile, onClose, onStatusChan
       const updatedTicket = { ...ticket, comments: updatedComments, updatedAt: new Date().toISOString() };
       onTicketUpdate(updatedTicket);
 
-      // Notifier le créateur du ticket (si ce n'est pas lui-même)
-      if (ticket.createdBy !== userProfile.uid) {
-        await addNotification({
-          userId: ticket.createdBy,
-          type: 'comment',
-          message: `${userProfile.displayName} a ajouté un commentaire au ticket`,
-          ticketId: ticket.id,
-          ticketTitle: ticket.title
-        });
-      }
-
-      // Notifier tous les admins (sauf si c'est un admin qui commente son propre ticket)
-      const admins = await getAllAdmins();
-      for (const admin of admins) {
-        if (admin.uid !== userProfile.uid && admin.uid !== ticket.createdBy) {
+      // Envoyer les notifications (ne pas bloquer si ça échoue)
+      try {
+        // Notifier le créateur du ticket (si ce n'est pas lui-même)
+        if (ticket.createdBy !== userProfile.uid) {
           await addNotification({
-            userId: admin.uid,
+            userId: ticket.createdBy,
             type: 'comment',
             message: `${userProfile.displayName} a ajouté un commentaire au ticket`,
             ticketId: ticket.id,
             ticketTitle: ticket.title
           });
         }
+
+        // Notifier tous les admins
+        const admins = await getAllAdmins();
+        for (const admin of admins) {
+          if (admin.uid !== userProfile.uid && admin.uid !== ticket.createdBy) {
+            await addNotification({
+              userId: admin.uid,
+              type: 'comment',
+              message: `${userProfile.displayName} a ajouté un commentaire au ticket`,
+              ticketId: ticket.id,
+              ticketTitle: ticket.title
+            });
+          }
+        }
+      } catch (notifError) {
+        console.error('Error sending comment notifications:', notifError);
+        // Continuer même si les notifications échouent
       }
 
       setNewComment('');
