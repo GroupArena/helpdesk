@@ -1,7 +1,3 @@
---- src/contexts/TicketModalContext.tsx (原始)
-
-
-+++ src/contexts/TicketModalContext.tsx (修改后)
 import { createContext, useContext, useState, ReactNode } from 'react';
 
 interface TicketModalContextType {
