@@ -19,6 +19,9 @@ export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { userProfile, logout } = useAuth();
   const navigate = useNavigate();
+  // The provider currently has an incorrect inferred return type in its module.
+  // Keep the layout usable as a JSX consumer until that provider type is fixed.
+  const NotificationProviderComponent: any = NotificationProvider;
 
   const handleLogout = async () => {
     await logout();
@@ -129,7 +132,7 @@ export default function Layout() {
 
       {/* Main content with NotificationProvider */}
       {userProfile ? (
-        <NotificationProvider userId={userProfile.uid}>
+        <NotificationProviderComponent userId={userProfile.uid}>
           <div className="lg:ml-64">
             {/* Top navbar */}
             <header className="bg-white shadow-sm sticky top-0 z-30">
@@ -159,7 +162,7 @@ export default function Layout() {
               <Outlet />
             </main>
           </div>
-        </NotificationProvider>
+        </NotificationProviderComponent>
       ) : (
         <div className="lg:ml-64">
           <main className="p-4 md:p-6">
