@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { dataService, Ticket, Comment } from '../config/dataService';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useTicketModal } from '../contexts/TicketModalContext';
 import { isDemoMode, db } from '../config/firebase';
-import { collection, query, where, onSnapshot, getDocs } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, getDocs, doc } from 'firebase/firestore';
 import toast from 'react-hot-toast';
 import { Plus, Search, Ticket as TicketIcon, X, MessageSquare, ChevronRight, Clock, AlertCircle, CheckCircle2, Download } from 'lucide-react';
 
@@ -144,12 +144,24 @@ export default function Tickets() {
 
   // Ouvrir la popup quand selectedTicketId change (depuis une notification)
   useEffect(() => {
-    if (selectedTicketId && tickets.length > 0) {
+    if (selectedTicketId) {
       const ticket = tickets.find(t => t.id === selectedTicketId);
       if (ticket) {
         setSelectedTicket(ticket);
         setShowDetailModal(true);
         closeTicket(); // Réinitialiser pour éviter les ouvertures multiples
+      } else if (tickets.length > 0) {
+        // Le ticket n'est pas encore dans la liste (peut arriver pour les admins)
+        // On attend un peu et on réessaie
+        const timeout = setTimeout(() => {
+          const retryTicket = tickets.find(t => t.id === selectedTicketId);
+          if (retryTicket) {
+            setSelectedTicket(retryTicket);
+            setShowDetailModal(true);
+          }
+          closeTicket();
+        }, 500);
+        return () => clearTimeout(timeout);
       }
     }
   }, [selectedTicketId, tickets]);
@@ -180,6 +192,7 @@ export default function Tickets() {
         status: 'open', createdBy: userProfile?.uid || '', createdByName: userProfile?.displayName || '',
         comments: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
       });
+      const createdTicketId = (newTicket as { id?: string } | null | undefined)?.id || '';
       toast.success('Ticket créé avec succès');
 
       // Notifier tous les admins de la création du ticket
@@ -187,15 +200,11 @@ export default function Tickets() {
         const admins = await getAllAdmins();
         for (const admin of admins) {
           if (admin.uid !== userProfile?.uid) {
-            const ticketResult = newTicket as Record<string, unknown> | null | undefined;
-            const ticketId = ticketResult && typeof ticketResult === 'object' && 'id' in ticketResult
-              ? String(ticketResult.id ?? '')
-              : '';
             await addNotification({
               userId: admin.uid,
               type: 'status_change',
               message: `${userProfile?.displayName} a créé un nouveau ticket`,
-              ticketId,
+              ticketId: createdTicketId,
               ticketTitle: formData.title
             });
           }
@@ -458,6 +467,34 @@ function TicketDetailModal({ ticket, isAdmin, userProfile, onClose, onStatusChan
   const { addNotification } = useNotifications();
   const [newComment, setNewComment] = useState('');
   const [assignee, setAssignee] = useState('');
+  const commentsEndRef = useRef<HTMLDivElement>(null);
+  const [localTicket, setLocalTicket] = useState<Ticket>(ticket);
+
+  // Mettre à jour le ticket local quand le ticket prop change
+  useEffect(() => {
+    setLocalTicket(ticket);
+  }, [ticket]);
+
+  // Listener temps réel pour les commentaires
+  useEffect(() => {
+    if (isDemoMode) return;
+
+    const ticketRef = doc(db, 'tickets', ticket.id);
+    const unsubscribe = onSnapshot(ticketRef, (docSnap: any) => {
+      if (docSnap.exists()) {
+        const updatedTicket = { id: docSnap.id, ...docSnap.data() } as Ticket;
+        setLocalTicket(updatedTicket);
+        onTicketUpdate(updatedTicket);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [ticket.id]);
+
+  // Auto-scroll vers le dernier commentaire
+  useEffect(() => {
+    commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [localTicket.comments]);
 
   const getStatusLabel = (status: string) => {
     switch (status) { case 'open': return 'Ouvert'; case 'in_progress': return 'En cours'; case 'resolved': return 'Résolu'; case 'closed': return 'Fermé'; default: return status; }
@@ -470,36 +507,37 @@ function TicketDetailModal({ ticket, isAdmin, userProfile, onClose, onStatusChan
     if (!newComment.trim() || !userProfile) return;
     try {
       const comment: Comment = { id: Date.now().toString(), text: newComment, author: userProfile.uid, authorName: userProfile.displayName, createdAt: new Date().toISOString() };
-      const updatedComments = [...(ticket.comments || []), comment];
-      await dataService.updateTicket(ticket.id, { comments: updatedComments, updatedAt: new Date().toISOString() });
+      const updatedComments = [...(localTicket.comments || []), comment];
+      await dataService.updateTicket(localTicket.id, { comments: updatedComments, updatedAt: new Date().toISOString() });
 
       // Mettre à jour le ticket localement pour affichage immédiat
-      const updatedTicket = { ...ticket, comments: updatedComments, updatedAt: new Date().toISOString() };
+      const updatedTicket = { ...localTicket, comments: updatedComments, updatedAt: new Date().toISOString() };
+      setLocalTicket(updatedTicket);
       onTicketUpdate(updatedTicket);
 
       // Envoyer les notifications (ne pas bloquer si ça échoue)
       try {
         // Notifier le créateur du ticket (si ce n'est pas lui-même)
-        if (ticket.createdBy !== userProfile.uid) {
+        if (localTicket.createdBy !== userProfile.uid) {
           await addNotification({
-            userId: ticket.createdBy,
+            userId: localTicket.createdBy,
             type: 'comment',
             message: `${userProfile.displayName} a ajouté un commentaire au ticket`,
-            ticketId: ticket.id,
-            ticketTitle: ticket.title
+            ticketId: localTicket.id,
+            ticketTitle: localTicket.title
           });
         }
 
         // Notifier tous les admins
         const admins = await getAllAdmins();
         for (const admin of admins) {
-          if (admin.uid !== userProfile.uid && admin.uid !== ticket.createdBy) {
+          if (admin.uid !== userProfile.uid && admin.uid !== localTicket.createdBy) {
             await addNotification({
               userId: admin.uid,
               type: 'comment',
               message: `${userProfile.displayName} a ajouté un commentaire au ticket`,
-              ticketId: ticket.id,
-              ticketTitle: ticket.title
+              ticketId: localTicket.id,
+              ticketTitle: localTicket.title
             });
           }
         }
@@ -522,10 +560,10 @@ function TicketDetailModal({ ticket, isAdmin, userProfile, onClose, onStatusChan
       <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 sticky top-0 bg-white z-10">
           <div>
-            <h2 className="text-lg font-semibold text-[#19283E]">{ticket.title}</h2>
+            <h2 className="text-lg font-semibold text-[#19283E]">{localTicket.title}</h2>
             <div className="flex items-center gap-2 mt-1">
-              <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getStatusColor(ticket.status)}`}>{getStatusLabel(ticket.status)}</span>
-              <span className="text-xs text-gray-400">{new Date(ticket.createdAt).toLocaleDateString('fr-FR')}</span>
+              <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded-full ${getStatusColor(localTicket.status)}`}>{getStatusLabel(localTicket.status)}</span>
+              <span className="text-xs text-gray-400">{new Date(localTicket.createdAt).toLocaleDateString('fr-FR')}</span>
             </div>
           </div>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600"><X size={20} /></button>
@@ -533,52 +571,56 @@ function TicketDetailModal({ ticket, isAdmin, userProfile, onClose, onStatusChan
 
         <div className="p-5 space-y-5">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Catégorie</p><p className="font-medium text-sm text-[#19283E]">{ticket.category}</p></div>
-            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Priorité</p><p className="font-medium text-sm text-[#19283E]">{ticket.priority === 'high' ? '🔴 Haute' : ticket.priority === 'medium' ? '🟡 Moyenne' : '🟢 Basse'}</p></div>
-            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Créé par</p><p className="font-medium text-sm text-[#19283E]">{ticket.createdByName}</p></div>
-            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Assigné à</p><p className="font-medium text-sm text-[#19283E]">{ticket.assignedToName || 'Non assigné'}</p></div>
+            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Catégorie</p><p className="font-medium text-sm text-[#19283E]">{localTicket.category}</p></div>
+            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Priorité</p><p className="font-medium text-sm text-[#19283E]">{localTicket.priority === 'high' ? '🔴 Haute' : localTicket.priority === 'medium' ? '🟡 Moyenne' : '🟢 Basse'}</p></div>
+            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Créé par</p><p className="font-medium text-sm text-[#19283E]">{localTicket.createdByName}</p></div>
+            <div className="bg-gray-50 rounded-lg p-3"><p className="text-xs text-gray-500">Assigné à</p><p className="font-medium text-sm text-[#19283E]">{localTicket.assignedToName || 'Non assigné'}</p></div>
           </div>
 
           <div>
             <h3 className="font-medium text-[#19283E] mb-2">Description</h3>
-            <p className="text-gray-600 text-sm whitespace-pre-wrap bg-gray-50 rounded-lg p-3">{ticket.description}</p>
+            <p className="text-gray-600 text-sm whitespace-pre-wrap bg-gray-50 rounded-lg p-3">{localTicket.description}</p>
           </div>
 
           {isAdmin && (
             <div className="border-t border-gray-100 pt-4 space-y-3">
               <h3 className="font-medium text-[#19283E]">Actions administrateur</h3>
               <div className="flex flex-wrap gap-2">
-                <select value={ticket.status} onChange={(e) => onStatusChange(ticket.id, e.target.value)}
+                <select value={localTicket.status} onChange={(e) => onStatusChange(localTicket.id, e.target.value)}
                   className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#C9A125] outline-none">
                   <option value="open">Ouvert</option><option value="in_progress">En cours</option><option value="resolved">Résolu</option><option value="closed">Fermé</option>
                 </select>
                 <div className="flex gap-1">
                   <input type="text" placeholder="Assigner à..." value={assignee} onChange={(e) => setAssignee(e.target.value)}
                     className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#C9A125] outline-none" />
-                  <button onClick={() => { onAssign(ticket.id, assignee); setAssignee(''); }}
+                  <button onClick={() => { onAssign(localTicket.id, assignee); setAssignee(''); }}
                     className="px-3 py-1.5 bg-[#19283E] text-white text-sm rounded-lg hover:bg-[#243552]">Assigner</button>
                 </div>
-                <button onClick={() => onDelete(ticket.id)} className="px-3 py-1.5 border border-red-200 text-red-600 text-sm rounded-lg hover:bg-red-50">Supprimer</button>
+                <button onClick={() => onDelete(localTicket.id)} className="px-3 py-1.5 border border-red-200 text-red-600 text-sm rounded-lg hover:bg-red-50">Supprimer</button>
               </div>
             </div>
           )}
 
           <div className="border-t border-gray-100 pt-4">
-            <h3 className="font-medium text-[#19283E] mb-3 flex items-center gap-2"><MessageSquare size={16} />Commentaires ({ticket.comments?.length || 0})</h3>
+            <h3 className="font-medium text-[#19283E] mb-3 flex items-center gap-2"><MessageSquare size={16} />Commentaires ({localTicket.comments?.length || 0})</h3>
             <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
-              {(!ticket.comments || ticket.comments.length === 0) ? (
+              {(!localTicket.comments || localTicket.comments.length === 0) ? (
                 <p className="text-sm text-gray-400 text-center py-4">Aucun commentaire</p>
               ) : (
-                ticket.comments.map((comment) => (
-                  <div key={comment.id} className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-[#19283E]">{comment.authorName}</span>
-                      <span className="text-xs text-gray-400">{new Date(comment.createdAt).toLocaleDateString('fr-FR')}</span>
+                localTicket.comments.map((comment) => {
+                  const isOwnComment = userProfile && comment.author === userProfile.uid;
+                  return (
+                    <div key={comment.id} className={`rounded-lg p-3 ${isOwnComment ? 'bg-gray-50' : 'bg-blue-500'}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-sm font-medium ${isOwnComment ? 'text-[#19283E]' : 'text-white'}`}>{comment.authorName}</span>
+                        <span className={`text-xs ${isOwnComment ? 'text-gray-400' : 'text-blue-100'}`}>{new Date(comment.createdAt).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                      <p className={`text-sm ${isOwnComment ? 'text-gray-600' : 'text-white'}`}>{comment.text}</p>
                     </div>
-                    <p className="text-sm text-gray-600">{comment.text}</p>
-                  </div>
-                ))
+                  );
+                })
               )}
+              <div ref={commentsEndRef} />
             </div>
             <div className="flex gap-2">
               <input type="text" value={newComment} onChange={(e) => setNewComment(e.target.value)} placeholder="Ajouter un commentaire..."
